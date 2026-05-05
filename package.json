@@ -1,0 +1,52 @@
+{
+  "name": "guardlog",
+  "version": "1.0.0",
+  "description": "Lightweight real-time CLI security log analyzer — detects brute force, SQL injection, XSS, and suspicious bots in server logs",
+  "main": "lib/analyzer.js",
+  "bin": {
+    "guardlog": "./bin/cli.js"
+  },
+  "scripts": {
+    "test": "node tests/guardlog.test.js",
+    "lint": "node --check bin/cli.js lib/**/*.js utils/*.js"
+  },
+  "keywords": [
+    "security",
+    "log-analyzer",
+    "cli",
+    "devops",
+    "devsecops",
+    "brute-force",
+    "sql-injection",
+    "xss",
+    "bot-detection",
+    "ci-cd",
+    "siem",
+    "log-monitoring"
+  ],
+  "author": "guardlog contributors",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "commander": "^12.1.0"
+  },
+  "devDependencies": {},
+  "files": [
+    "bin/",
+    "lib/",
+    "utils/",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/guardlog.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/guardlog/issues"
+  },
+  "homepage": "https://github.com/yourusername/guardlog#readme"
+}

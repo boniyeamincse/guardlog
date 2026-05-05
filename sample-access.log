@@ -1,0 +1,46 @@
+# Sample Apache/Nginx Combined Log Format access log
+# Used to demonstrate guardlog detection capabilities
+
+# Normal traffic
+192.168.0.1 - alice [05/May/2026:10:00:00 +0000] "GET /index.html HTTP/1.1" 200 2048 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+192.168.0.2 - bob [05/May/2026:10:00:01 +0000] "GET /about HTTP/1.1" 200 1024 "https://example.com" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"
+192.168.0.3 - - [05/May/2026:10:00:02 +0000] "GET /contact HTTP/1.1" 200 512 "-" "Mozilla/5.0 (X11; Linux x86_64)"
+
+# Brute force attack on /login from 10.0.0.99
+10.0.0.99 - - [05/May/2026:10:01:00 +0000] "POST /login HTTP/1.1" 401 256 "-" "Mozilla/5.0"
+10.0.0.99 - - [05/May/2026:10:01:02 +0000] "POST /login HTTP/1.1" 401 256 "-" "Mozilla/5.0"
+10.0.0.99 - - [05/May/2026:10:01:04 +0000] "POST /login HTTP/1.1" 401 256 "-" "Mozilla/5.0"
+10.0.0.99 - - [05/May/2026:10:01:06 +0000] "POST /login HTTP/1.1" 401 256 "-" "Mozilla/5.0"
+10.0.0.99 - - [05/May/2026:10:01:08 +0000] "POST /login HTTP/1.1" 401 256 "-" "Mozilla/5.0"
+10.0.0.99 - - [05/May/2026:10:01:10 +0000] "POST /login HTTP/1.1" 401 256 "-" "Mozilla/5.0"
+10.0.0.99 - - [05/May/2026:10:01:12 +0000] "POST /login HTTP/1.1" 401 256 "-" "Mozilla/5.0"
+10.0.0.99 - - [05/May/2026:10:01:14 +0000] "POST /login HTTP/1.1" 401 256 "-" "Mozilla/5.0"
+10.0.0.99 - - [05/May/2026:10:01:16 +0000] "POST /login HTTP/1.1" 401 256 "-" "Mozilla/5.0"
+10.0.0.99 - - [05/May/2026:10:01:18 +0000] "POST /login HTTP/1.1" 401 256 "-" "Mozilla/5.0"
+10.0.0.99 - - [05/May/2026:10:01:20 +0000] "POST /login HTTP/1.1" 401 256 "-" "Mozilla/5.0"
+10.0.0.99 - - [05/May/2026:10:01:22 +0000] "POST /login HTTP/1.1" 401 256 "-" "Mozilla/5.0"
+
+# SQL Injection attempts from 172.16.0.5
+172.16.0.5 - - [05/May/2026:10:02:00 +0000] "GET /search?q=%27%20OR%201%3D1 HTTP/1.1" 200 512 "-" "Mozilla/5.0"
+172.16.0.5 - - [05/May/2026:10:02:01 +0000] "GET /api/users?id=1%3B%20DROP%20TABLE%20users HTTP/1.1" 500 128 "-" "Mozilla/5.0"
+172.16.0.5 - - [05/May/2026:10:02:02 +0000] "GET /products?cat=1%20UNION%20SELECT%20username%2Cpassword%20FROM%20users HTTP/1.1" 200 4096 "-" "Mozilla/5.0"
+172.16.0.5 - - [05/May/2026:10:02:03 +0000] "GET /page?id=1%3BSELECT%20SLEEP(5) HTTP/1.1" 200 128 "-" "sqlmap/1.7"
+
+# XSS attempts from 172.16.0.6
+172.16.0.6 - - [05/May/2026:10:03:00 +0000] "GET /search?q=<script>alert(document.cookie)</script> HTTP/1.1" 200 512 "-" "Mozilla/5.0"
+172.16.0.6 - - [05/May/2026:10:03:01 +0000] "GET /profile?name=<img+src=x+onerror=alert(1)> HTTP/1.1" 200 512 "-" "Mozilla/5.0"
+172.16.0.6 - - [05/May/2026:10:03:02 +0000] "GET /comment?text=javascript:eval(atob('YWxlcnQoMSk=')) HTTP/1.1" 200 512 "-" "Mozilla/5.0"
+
+# Bot / Scanner activity from 192.0.2.200
+192.0.2.200 - - [05/May/2026:10:04:00 +0000] "GET /.env HTTP/1.1" 404 128 "-" "python-requests/2.28.0"
+192.0.2.200 - - [05/May/2026:10:04:01 +0000] "GET /wp-config.php HTTP/1.1" 404 128 "-" "curl/7.88.0"
+192.0.2.200 - - [05/May/2026:10:04:02 +0000] "GET /phpinfo.php HTTP/1.1" 404 128 "-" "nikto/2.1.6"
+192.0.2.200 - - [05/May/2026:10:04:03 +0000] "GET /.git/config HTTP/1.1" 403 128 "-" "dirbuster/1.0"
+192.0.2.200 - - [05/May/2026:10:04:04 +0000] "GET /backup.zip HTTP/1.1" 404 128 "-" "gobuster/3.6"
+192.0.2.200 - - [05/May/2026:10:04:05 +0000] "GET /admin/ HTTP/1.1" 401 512 "-" "nuclei/2.9.0"
+192.0.2.200 - - [05/May/2026:10:04:06 +0000] "GET /phpmyadmin/ HTTP/1.1" 404 128 "-" "sqlmap/1.7"
+
+# More normal traffic
+10.20.30.1 - carol [05/May/2026:10:05:00 +0000] "GET /dashboard HTTP/1.1" 200 8192 "https://myapp.com" "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0)"
+10.20.30.2 - - [05/May/2026:10:05:01 +0000] "POST /api/data HTTP/1.1" 201 256 "-" "Mozilla/5.0"
+10.20.30.3 - - [05/May/2026:10:05:02 +0000] "GET /static/main.js HTTP/1.1" 304 0 "https://myapp.com" "Mozilla/5.0"

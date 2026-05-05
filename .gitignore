@@ -1,0 +1,10 @@
+node_modules/
+*.log
+!sample-access.log
+guardlog-report.json
+guardlog-report.csv
+*.gz
+.DS_Store
+.env
+npm-debug.log*
+package-lock.json

@@ -24,7 +24,7 @@
     "siem",
     "log-monitoring"
   ],
-  "author": "guardlog contributors",
+  "author": "Boni Yeamin <https://github.com/boniyeamincse>",
   "license": "MIT",
   "engines": {
     "node": ">=18.0.0"
@@ -43,10 +43,10 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/guardlog.git"
+    "url": "https://github.com/boniyeamincse/guardlog.git"
   },
   "bugs": {
-    "url": "https://github.com/yourusername/guardlog/issues"
+    "url": "https://github.com/boniyeamincse/guardlog/issues"
   },
-  "homepage": "https://github.com/yourusername/guardlog#readme"
+  "homepage": "https://github.com/boniyeamincse/guardlog#readme"
 }

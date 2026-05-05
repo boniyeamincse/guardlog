@@ -19,6 +19,9 @@ const { scan: scanBot } = require('../lib/scanner/botDetector');
 const { analyzeEntries } = require('../lib/analyzer');
 const { calculateRisk } = require('../utils/riskEngine');
 const { toJSON } = require('../lib/reporter');
+const { toCSV } = require('../lib/reporter');
+const { scan: scanSD } = require('../lib/scanner/scanDetector');
+const { applyFilters } = require('../utils/filter');
 
 // ── Parser tests ─────────────────────────────────────────────────────────────
 describe('Parser', () => {
@@ -244,5 +247,205 @@ describe('Analyzer', () => {
     const json = toJSON(result);
     const parsed = JSON.parse(json);
     assert.equal(parsed.summary.risk_level, 'LOW');
+  });
+});
+
+// ── 404 Scan Detector ─────────────────────────────────────────────────────────
+describe('Scan Detector', () => {
+  test('detects .env path probe immediately', () => {
+    const { hits } = scanSD([{
+      ip: '5.5.5.5', timestamp: Date.now(), method: 'GET',
+      path: '/.env', status: 404, size: '-', referer: '-',
+      userAgent: 'Mozilla/5.0', raw: '',
+    }]);
+    assert.ok(hits.length > 0);
+  });
+
+  test('detects .bak file probe', () => {
+    const { hits } = scanSD([{
+      ip: '5.5.5.5', timestamp: Date.now(), method: 'GET',
+      path: '/config.bak', status: 404, size: '-', referer: '-',
+      userAgent: 'Mozilla/5.0', raw: '',
+    }]);
+    assert.ok(hits.length > 0);
+  });
+
+  test('detects 404 flood (directory brute force)', () => {
+    const now = Date.now();
+    const entries = Array.from({ length: 25 }, (_, i) => ({
+      ip: '6.6.6.6',
+      timestamp: now + i * 1000,
+      method: 'GET',
+      path: `/dir${i}/index.php`,
+      status: 404,
+      size: '-',
+      referer: '-',
+      userAgent: 'dirbuster/1.0',
+      raw: '',
+    }));
+    const { hits, attackerIps } = scanSD(entries);
+    assert.ok(hits.length > 0, 'should detect 404 flood');
+    assert.ok(attackerIps.has('6.6.6.6'));
+  });
+
+  test('passes normal 404s below threshold', () => {
+    const now = Date.now();
+    const entries = Array.from({ length: 5 }, (_, i) => ({
+      ip: '7.7.7.7',
+      timestamp: now + i * 1000,
+      method: 'GET',
+      path: `/missing${i}`,
+      status: 404,
+      size: '-',
+      referer: '-',
+      userAgent: 'Mozilla/5.0',
+      raw: '',
+    }));
+    const { hits } = scanSD(entries);
+    assert.equal(hits.length, 0);
+  });
+});
+
+// ── Filter Utility ────────────────────────────────────────────────────────────
+describe('Filter Utility', () => {
+  const makeEntry = (ip, status, path = '/') => ({
+    ip,
+    timestamp: Date.now(),
+    method: 'GET',
+    path,
+    status,
+    size: '-',
+    referer: '-',
+    userAgent: 'Mozilla/5.0',
+    raw: '',
+  });
+
+  test('filters by exact IP', () => {
+    const entries = [makeEntry('1.2.3.4', 200), makeEntry('9.8.7.6', 200)];
+    const result = applyFilters(entries, { ip: '1.2.3.4' });
+    assert.equal(result.length, 1);
+    assert.equal(result[0].ip, '1.2.3.4');
+  });
+
+  test('filters by CIDR /24', () => {
+    const entries = [
+      makeEntry('192.168.1.10', 200),
+      makeEntry('192.168.1.20', 200),
+      makeEntry('10.0.0.1', 200),
+    ];
+    const result = applyFilters(entries, { ip: '192.168.1.0/24' });
+    assert.equal(result.length, 2);
+  });
+
+  test('filters by status code', () => {
+    const entries = [makeEntry('1.1.1.1', 200), makeEntry('2.2.2.2', 404), makeEntry('3.3.3.3', 404)];
+    const result = applyFilters(entries, { status: 404 });
+    assert.equal(result.length, 2);
+  });
+
+  test('filters by date range', () => {
+    const base = Date.now();
+    const entries = [
+      { ...makeEntry('1.1.1.1', 200), timestamp: base - 10000 },
+      { ...makeEntry('2.2.2.2', 200), timestamp: base },
+      { ...makeEntry('3.3.3.3', 200), timestamp: base + 10000 },
+    ];
+    const result = applyFilters(entries, { since: base - 5000, until: base + 5000 });
+    assert.equal(result.length, 1);
+    assert.equal(result[0].ip, '2.2.2.2');
+  });
+
+  test('filters by path regex', () => {
+    const entries = [
+      makeEntry('1.1.1.1', 200, '/api/users'),
+      makeEntry('2.2.2.2', 200, '/login'),
+      makeEntry('3.3.3.3', 200, '/api/orders'),
+    ];
+    const result = applyFilters(entries, { pathPattern: '^/api/' });
+    assert.equal(result.length, 2);
+  });
+
+  test('returns all entries when no filters provided', () => {
+    const entries = [makeEntry('1.1.1.1', 200), makeEntry('2.2.2.2', 404)];
+    assert.equal(applyFilters(entries, {}).length, 2);
+    assert.equal(applyFilters(entries).length, 2);
+  });
+});
+
+// ── CSV Reporter ──────────────────────────────────────────────────────────────
+describe('CSV Reporter', () => {
+  test('produces valid CSV with summary and IP sections', () => {
+    const entries = [{
+      ip: '8.8.8.8', timestamp: Date.now(), method: 'GET',
+      path: "/?q=' OR 1=1", status: 200, size: '-',
+      referer: '-', userAgent: 'curl/7.0', raw: '',
+    }];
+    const result = analyzeEntries(entries, 'test.log');
+    const csv = toCSV(result);
+    assert.ok(csv.includes('risk_level'), 'should have header');
+    assert.ok(csv.includes('HIGH') || csv.includes('MEDIUM') || csv.includes('LOW'));
+    assert.ok(csv.includes('rank,ip,hit_count,reason'));
+  });
+
+  test('CSV summary row has correct field count', () => {
+    const result = analyzeEntries([], 'empty.log');
+    const csv = toCSV(result);
+    const lines = csv.split('\n').filter(l => l && !l.startsWith('#'));
+    const headerLine = lines[0];
+    const dataLine = lines[1];
+    const headerCols = headerLine.split(',').length;
+    const dataCols = dataLine.split(',').length;
+    assert.equal(headerCols, dataCols, 'header and data must have same column count');
+  });
+});
+
+// ── Plugin Architecture ────────────────────────────────────────────────────────
+describe('Plugin Architecture', () => {
+  test('custom plugin results are merged into report', () => {
+    const entries = [{
+      ip: '99.99.99.99', timestamp: Date.now(), method: 'GET',
+      path: '/custom-threat', status: 200, size: '-',
+      referer: '-', userAgent: 'Mozilla/5.0', raw: '',
+    }];
+
+    const customPlugin = {
+      name: 'myCustomScanner',
+      scan(ents) {
+        const hits = ents.filter(e => e.path.includes('custom-threat'));
+        const attackerIps = new Map();
+        for (const h of hits) attackerIps.set(h.ip, (attackerIps.get(h.ip) || 0) + 1);
+        return { hits, attackerIps };
+      },
+    };
+
+    const result = analyzeEntries(entries, 'test', { plugins: [customPlugin] });
+    assert.ok(result.threats.plugins, 'should have plugins field');
+    assert.equal(result.threats.plugins.myCustomScanner, 1);
+  });
+
+  test('plugin error does not crash analyzer', () => {
+    const entries = [];
+    const brokenPlugin = {
+      name: 'broken',
+      scan() { throw new Error('plugin exploded'); },
+    };
+    assert.doesNotThrow(() => analyzeEntries(entries, 'test', { plugins: [brokenPlugin] }));
+  });
+});
+
+// ── Risk Engine (scan_detection) ──────────────────────────────────────────────
+describe('Risk Engine — scan_detection', () => {
+  test('returns HIGH for large 404 flood', () => {
+    assert.equal(
+      calculateRisk({ bruteForce: 0, sqlInjection: 0, xss: 0, botActivity: 0, scanDetection: 25 }, 1000),
+      'HIGH'
+    );
+  });
+
+  test('returns MEDIUM for moderate scan activity', () => {
+    assert.equal(
+      calculateRisk({ bruteForce: 0, sqlInjection: 0, xss: 0, botActivity: 0, scanDetection: 10 }, 1000),
+      'MEDIUM'
+    );
   });
 });

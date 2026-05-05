@@ -16,15 +16,16 @@
  * @returns {'LOW'|'MEDIUM'|'HIGH'}
  */
 function calculateRisk(threats, totalRequests) {
-  const totalSuspicious = threats.bruteForce + threats.sqlInjection + threats.xss + threats.botActivity;
+  const scanDetection = threats.scanDetection || 0;
+  const totalSuspicious = threats.bruteForce + threats.sqlInjection + threats.xss + threats.botActivity + scanDetection;
 
   // Any direct injection/execution attack = immediate HIGH
   if (threats.sqlInjection > 0 || threats.xss > 0) return 'HIGH';
   if (threats.bruteForce > 5) return 'HIGH';
 
   // Significant bot activity or moderate brute force
-  if (threats.botActivity > 50) return 'HIGH';
-  if (threats.bruteForce > 0 || threats.botActivity > 10) return 'MEDIUM';
+  if (threats.botActivity > 50 || scanDetection > 20) return 'HIGH';
+  if (threats.bruteForce > 0 || threats.botActivity > 10 || scanDetection > 5) return 'MEDIUM';
 
   // Percentage-based check: >5% suspicious = MEDIUM
   if (totalRequests > 0 && (totalSuspicious / totalRequests) > 0.05) return 'MEDIUM';

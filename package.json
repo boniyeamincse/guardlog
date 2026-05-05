@@ -1,6 +1,6 @@
 {
   "name": "guardlog",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Lightweight real-time CLI security log analyzer — detects brute force, SQL injection, XSS, and suspicious bots in server logs",
   "main": "lib/analyzer.js",
   "bin": {

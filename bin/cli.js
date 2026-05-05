@@ -38,23 +38,66 @@ const PKG = JSON.parse(
 
 program
   .name('guardlog')
-  .description('Real-time CLI security log analyzer')
-  .version(PKG.version);
+  .description(
+    'Real-time CLI security log analyzer for Nginx, Apache, and API logs.\n' +
+    'Detects brute force, SQL injection, XSS, bots, and directory scans.'
+  )
+  .version(PKG.version)
+  .addHelpText('after', `
+Commands:
+  scan <file>        Analyze a log file for security threats
+  monitor            Watch a log file in real-time (live tail mode)
+
+Examples:
+  Basic scan:
+    $ guardlog scan /var/log/nginx/access.log
+
+  Output formats:
+    $ guardlog scan access.log --json
+    $ guardlog scan access.log --csv
+    $ guardlog scan access.log --output report.json
+    $ guardlog scan access.log --output report.csv
+
+  CI/CD gate (exit 1 on HIGH risk):
+    $ guardlog scan access.log --ci
+
+  Scan a gzipped rotated log:
+    $ guardlog scan access.log.gz
+
+  Filter traffic:
+    $ guardlog scan access.log --filter-ip 192.168.1.55
+    $ guardlog scan access.log --filter-ip 10.0.0.0/8
+    $ guardlog scan access.log --filter-status 401
+    $ guardlog scan access.log --since "2026-05-01T00:00:00Z" --until "2026-05-02T00:00:00Z"
+    $ guardlog scan access.log --path-filter "^/api/"
+
+  Webhook / Slack alert:
+    $ guardlog scan access.log --webhook https://hooks.slack.com/services/T.../B.../xxx
+
+  Live monitor mode:
+    $ guardlog monitor --live /var/log/nginx/access.log
+
+Docs: https://github.com/boniyeamincse/guardlog
+`);
 
 // ── scan command ────────────────────────────────────────────────────────────
 program
   .command('scan <file>')
-  .description('Analyze a log file for security threats')
-  .option('--json', 'Output raw JSON report to stdout')
-  .option('--csv', 'Output CSV report to stdout')
-  .option('--output <path>', 'Write JSON report to a file')
-  .option('--ci', 'CI mode: exit code 1 if risk is HIGH')
-  .option('--filter-ip <ip>', 'Only analyze entries from this IP or CIDR (e.g. 10.0.0.0/8)')
-  .option('--filter-status <code>', 'Only analyze entries with this HTTP status code', parseInt)
-  .option('--since <datetime>', 'Entries at or after this time (ISO 8601 or Unix ms)')
-  .option('--until <datetime>', 'Entries at or before this time (ISO 8601 or Unix ms)')
-  .option('--path-filter <pattern>', 'Only analyze entries whose path matches this regex')
-  .option('--webhook <url>', 'POST the JSON report to this URL after scanning')
+  .description(
+    'Analyze a log file for security threats.\n' +
+    'Supports plain text and gzipped (.gz) log files.\n' +
+    'Formats: Apache/Nginx Combined Log Format, W3C/IIS Extended.'
+  )
+  .option('--json',                  'Print JSON report to stdout (machine-readable)')
+  .option('--csv',                   'Print CSV report to stdout (spreadsheet-friendly)')
+  .option('--output <path>',         'Save report to file (format auto-detected by extension: .json or .csv)')
+  .option('--ci',                    'CI mode — exit code 1 when risk is HIGH, 0 when safe')
+  .option('--filter-ip <ip>',        'Only include entries from this IP or CIDR range  e.g. 10.0.0.0/8')
+  .option('--filter-status <code>',  'Only include entries with this HTTP status code  e.g. 401', parseInt)
+  .option('--since <datetime>',      'Only include entries at or after this time  e.g. 2026-05-01T00:00:00Z')
+  .option('--until <datetime>',      'Only include entries at or before this time  e.g. 2026-05-02T00:00:00Z')
+  .option('--path-filter <pattern>', 'Only include entries whose URL path matches this regex  e.g. ^/api/')
+  .option('--webhook <url>',         'POST the JSON report to this URL (Slack Incoming Webhooks supported)')
   .action(async (file, opts) => {
     const absFile = path.resolve(file);
 
@@ -127,8 +170,11 @@ program
 // ── monitor command ──────────────────────────────────────────────────────────
 program
   .command('monitor')
-  .description('Watch a log file in real-time for threats')
-  .requiredOption('--live <file>', 'Log file to watch')
+  .description(
+    'Watch a log file in real-time and report threats as new entries arrive.\n' +
+    'Works like tail -f — press Ctrl+C to stop.'
+  )
+  .requiredOption('--live <file>', 'Path to the log file to watch')
   .action(async (opts) => {
     const absFile = path.resolve(opts.live);
 

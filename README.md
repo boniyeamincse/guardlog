@@ -4,124 +4,302 @@
 
 [![npm version](https://img.shields.io/npm/v/guardlog)](https://www.npmjs.com/package/guardlog)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Node.js CI](https://github.com/yourusername/guardlog/actions/workflows/ci.yml/badge.svg)](https://github.com/yourusername/guardlog/actions)
+[![Node.js CI](https://github.com/boniyeamincse/guardlog/actions/workflows/ci.yml/badge.svg)](https://github.com/boniyeamincse/guardlog/actions)
+[![Node.js](https://img.shields.io/badge/node-%3E%3D18-brightgreen)](https://nodejs.org)
+
+**guardlog** scans Nginx, Apache, and API access logs for security threats — brute force attacks, SQL injection, XSS, malicious bots, and directory scans — and gives you a color-coded risk report in seconds. Use it in your terminal, CI/CD pipeline, or as a Node.js library.
+
+---
+
+## Table of Contents
+
+- [Why guardlog?](#why-guardlog)
+- [Features](#features)
+- [Prerequisites](#prerequisites)
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Use Cases](#use-cases)
+- [CLI Reference](#cli-reference)
+- [Usage Examples](#usage-examples)
+- [Log Filtering](#log-filtering)
+- [Webhook Alerts](#webhook-alerts)
+- [Output Formats](#output-formats)
+- [Exit Codes](#exit-codes)
+- [Supported Log Formats](#supported-log-formats)
+- [Detection Rules](#detection-rules)
+- [CI/CD Integration](#cicd-integration)
+- [Node.js API](#nodejs-api)
+- [Plugin API](#plugin-api)
+- [Architecture](#architecture)
+- [Running Tests](#running-tests)
+- [Contributing](#contributing)
+- [License](#license)
+
+---
+
+## Why guardlog?
+
+| Problem | guardlog solution |
+|---|---|
+| You got breached — when did it start? | Scan historical logs in seconds |
+| Server is slow — is someone brute-forcing? | Live monitor mode shows threats in real time |
+| CI pipeline has no security gate | `--ci` exits `1` on HIGH risk — blocks the deploy |
+| Log files are 2 GB | Streaming parser — never loads the full file into memory |
+| Need to alert the team on Slack | `--webhook` sends a formatted Slack message automatically |
 
 ---
 
 ## Features
 
-### ⚡ Core Log Scanning
-- Nginx / Apache / API log file scanning
-- Large file streaming — `fs.createReadStream` + `readline`, no full-file memory load
-- O(n) processing engine
-- Multi-format support: Apache/Nginx **Combined Log Format** and **W3C/IIS Extended** format
-- **Rotated log support** — automatically decompresses `.gz` / `.gzip` files via `zlib`
-
 ### 🚨 Threat Detection Engine
+
 | Detector | What it catches |
 |---|---|
 | **Brute Force** | Repeated 401/403/429s on login endpoints; high-frequency IP bursts |
 | **SQL Injection** | 18+ signatures: `UNION SELECT`, `DROP TABLE`, `SLEEP()`, `xp_cmdshell`, encoded variants |
 | **XSS** | `<script>`, `onerror=`, `alert()`, `document.cookie`, encoded payloads |
-| **Bot / Scanner** | 20+ UA blacklist entries (curl, sqlmap, nikto, nuclei…); missing UA; frequency |
-| **404 Scan / Probe** | Directory brute force floods; `.env`, `.bak`, `wp-config.php`, `.git/` probes |
+| **Bot / Scanner** | 20+ UA blacklist entries (sqlmap, nikto, nuclei, nmap…); missing UA; frequency bursts |
+| **404 Scan / Probe** | Directory brute force floods; `.env`, `.git/`, `wp-config.php` probes |
 
-### 📊 Risk Scoring System
+### 📊 Risk Scoring
+
 - `LOW` / `MEDIUM` / `HIGH` classification
 - Automatic threat aggregation and severity-based summary
-- Percentage-of-traffic based escalation
 
-### 🧾 Output System
-- **Terminal** — color-coded, human-readable report (chalk)
-- **JSON** — structured, machine-readable (`--json`, `--output report.json`)
-- **CSV** — spreadsheet-friendly (`--csv`, `--output report.csv`)
+### 🧾 Output Formats
 
-### ⚙️ CLI Features
-- `guardlog scan file.log`
-- `guardlog scan file.log --json`
-- `guardlog scan file.log --csv`
-- `guardlog scan file.log --output report.json`
-- `guardlog scan file.log --output report.csv`
-- `guardlog scan file.log --ci`
-- `guardlog monitor --live /var/log/nginx/access.log`
+- **Terminal** — color-coded, human-readable (powered by chalk)
+- **JSON** — structured, machine-readable (`--json` or `--output report.json`)
+- **CSV** — spreadsheet-friendly (`--csv` or `--output report.csv`)
 
-### 🔍 Log Filtering System
-- Filter by IP address or CIDR range
-- Filter by HTTP status code
-- Filter by date/time range (`--since` / `--until`)
-- Filter by URL path regex (`--path-filter`)
+### ⚡ Performance
 
-### 🔁 Real-time / Live Mode
-- `tail -f` style file watching (`fs.watch`)
-- Batch analysis on each flush interval
-- Instant threat detection for new log lines
+- Streaming architecture — `fs.createReadStream` + `readline`, O(n), no full-file memory load
+- Supports plain text and gzipped (`.gz`) rotated logs
 
-### 🚀 CI/CD Integration
-- Exit code `0` = safe, `1` = HIGH risk, `2` = error
-- GitHub Actions workflow included
-- Pipeline security gate support
+### 🔌 Extensible
 
-### 🔔 Webhook Alerts
-- POST JSON report to any HTTP/HTTPS endpoint
-- Built-in Slack Incoming Webhook format support
-- Zero external dependencies (Node.js `https` module only)
+- Plugin API — add custom scanner modules at runtime
+- Webhook alerts — POST reports to any HTTP endpoint or Slack
 
-### 🔌 Plugin Architecture
-- Plug in custom scanner modules at runtime
-- Each plugin receives the parsed entry stream
-- Plugin errors are isolated — never crash the main analyzer
+---
+
+## Prerequisites
+
+- **Node.js** v18 or later ([download](https://nodejs.org))
+- **npm** v9 or later (included with Node.js)
+
+Check your versions:
+
+```bash
+node --version   # should be >= v18.0.0
+npm --version    # should be >= 9.0.0
+```
 
 ---
 
 ## Installation
 
 ```bash
-# Global install (recommended for CLI usage)
+# Global install — use guardlog anywhere in your terminal
 npm install -g guardlog
 
-# Or use with npx (no install)
+# Verify install
+guardlog --version
+guardlog --help
+```
+
+No global install? Use `npx` — runs without installing:
+
+```bash
 npx guardlog scan ./access.log
 ```
 
 ---
 
-## Usage
+## Quick Start
 
-### Basic scan
+**Your first scan in under 60 seconds:**
 
 ```bash
-guardlog scan ./access.log
+# 1. Install
+npm install -g guardlog
+
+# 2. Scan your Nginx or Apache access log
+guardlog scan /var/log/nginx/access.log
+
+# 3. See a color-coded security report in your terminal
+```
+
+**Don't have a log file handy? Create a test one:**
+
+```bash
+cat > /tmp/test.log << 'EOF'
+192.168.1.10 - - [05/May/2026:10:00:01 +0000] "GET /login HTTP/1.1" 401 512 "-" "Mozilla/5.0"
+192.168.1.10 - - [05/May/2026:10:00:02 +0000] "GET /login HTTP/1.1" 401 512 "-" "Mozilla/5.0"
+192.168.1.10 - - [05/May/2026:10:00:03 +0000] "GET /login HTTP/1.1" 401 512 "-" "Mozilla/5.0"
+10.0.0.5 - - [05/May/2026:10:00:04 +0000] "GET /index.php?id=1+UNION+SELECT+1,2,3-- HTTP/1.1" 200 800 "-" "sqlmap/1.7"
+10.0.0.5 - - [05/May/2026:10:00:05 +0000] "GET /.env HTTP/1.1" 404 0 "-" "curl/7.88"
+EOF
+
+guardlog scan /tmp/test.log
+```
+
+---
+
+## Use Cases
+
+### 1. Incident Response — "Were we attacked?"
+
+After an incident, scan historical logs to identify when the attack started, which IPs were involved, and what techniques were used.
+
+```bash
+guardlog scan /var/log/nginx/access.log --output incident-report.json
+```
+
+---
+
+### 2. Daily Security Audit
+
+Run guardlog on a schedule (cron) to receive a daily security summary.
+
+```bash
+# Run every day at 6 AM — save report with date in filename
+0 6 * * * guardlog scan /var/log/nginx/access.log --output /var/reports/daily-$(date +\%F).json
+```
+
+---
+
+### 3. CI/CD Security Gate
+
+Block a deployment when HIGH-risk patterns appear in staging logs.
+
+```bash
+guardlog scan staging-access.log --ci
+# exits 0 = safe, 1 = HIGH risk (blocks the pipeline)
+```
+
+---
+
+### 4. Real-time Monitoring
+
+Watch a live web server log for threats as they arrive — like `tail -f` with threat intelligence.
+
+```bash
+guardlog monitor --live /var/log/nginx/access.log
+```
+
+---
+
+### 5. Slack / Team Alerts
+
+Send a formatted security report to your team's Slack channel after each scan.
+
+```bash
+guardlog scan /var/log/nginx/access.log \
+  --webhook https://hooks.slack.com/services/T.../B.../xxx
+```
+
+---
+
+### 6. Investigate a Suspicious IP
+
+Analyze only the traffic from one IP or subnet.
+
+```bash
+guardlog scan access.log --filter-ip 203.0.113.42
+guardlog scan access.log --filter-ip 10.0.0.0/8
+```
+
+---
+
+### 7. Scan Rotated (Compressed) Logs
+
+Old logs are usually gzipped. guardlog decompresses them automatically.
+
+```bash
+guardlog scan /var/log/nginx/access.log.1.gz
+```
+
+---
+
+## CLI Reference
+
+### `scan` command
+
+```
+guardlog scan <file> [options]
+```
+
+Analyze a log file for security threats. Supports plain text and `.gz` files.
+
+| Flag | Description | Example |
+|------|-------------|---------|
+| `--json` | Print JSON report to stdout | `--json` |
+| `--csv` | Print CSV report to stdout | `--csv` |
+| `--output <path>` | Save report to file (format auto-detected: `.json` or `.csv`) | `--output report.json` |
+| `--ci` | Exit code `1` if HIGH risk, `0` if safe | `--ci` |
+| `--filter-ip <ip>` | Only include entries from this IP or CIDR range | `--filter-ip 10.0.0.0/8` |
+| `--filter-status <code>` | Only include entries with this HTTP status code | `--filter-status 401` |
+| `--since <datetime>` | Only include entries at or after this time (ISO 8601) | `--since 2026-05-01T00:00:00Z` |
+| `--until <datetime>` | Only include entries at or before this time (ISO 8601) | `--until 2026-05-02T00:00:00Z` |
+| `--path-filter <regex>` | Only include entries whose URL path matches this regex | `--path-filter ^/api/` |
+| `--webhook <url>` | POST the JSON report to this URL after scanning | `--webhook https://hooks.slack.com/...` |
+
+---
+
+### `monitor` command
+
+```
+guardlog monitor --live <file>
+```
+
+Watch a log file in real-time and display threat reports as new lines arrive. Press `Ctrl+C` to stop.
+
+| Flag | Description | Required |
+|------|-------------|----------|
+| `--live <file>` | Path to the log file to watch | Yes |
+
+---
+
+## Usage Examples
+
+### Basic scan (terminal output)
+
+```bash
+guardlog scan /var/log/nginx/access.log
 ```
 
 ### JSON output to stdout
 
 ```bash
-guardlog scan ./access.log --json
+guardlog scan access.log --json
 ```
 
 ### CSV output to stdout
 
 ```bash
-guardlog scan ./access.log --csv
+guardlog scan access.log --csv
 ```
 
-### Save report to file (auto-detects format by extension)
+### Save report to file
 
 ```bash
-guardlog scan ./access.log --output report.json
-guardlog scan ./access.log --output report.csv
+guardlog scan access.log --output report.json
+guardlog scan access.log --output report.csv
 ```
 
-### CI mode — exit code 1 when risk is HIGH
+### CI mode
 
 ```bash
-guardlog scan ./access.log --ci
+guardlog scan access.log --ci
+echo "Exit: $?"   # 0 = safe, 1 = HIGH risk, 2 = error
 ```
 
-### Scan a rotated (gzipped) log file
+### Scan a gzipped rotated log
 
 ```bash
-guardlog scan ./access.log.gz
+guardlog scan /var/log/nginx/access.log.1.gz
 ```
 
 ### Live monitor mode
@@ -130,52 +308,76 @@ guardlog scan ./access.log.gz
 guardlog monitor --live /var/log/nginx/access.log
 ```
 
+### CI + Slack alert combined
+
+```bash
+guardlog scan access.log --ci \
+  --webhook https://hooks.slack.com/services/T.../B.../xxx
+```
+
 ---
 
 ## Log Filtering
 
-All filters can be combined. They are ANDed — an entry must pass every active filter.
+All filters can be combined. An entry must pass **every** active filter to be included.
 
 ```bash
-# Only analyze traffic from a specific IP
+# Specific IP only
 guardlog scan access.log --filter-ip 192.168.1.55
 
-# Only analyze a subnet (CIDR)
+# Entire subnet (CIDR)
 guardlog scan access.log --filter-ip 10.0.0.0/8
 
-# Only analyze 401 (unauthorized) responses
+# Only 401 Unauthorized responses
 guardlog scan access.log --filter-status 401
 
-# Only analyze a time range
-guardlog scan access.log --since "2026-05-01T00:00:00Z" --until "2026-05-02T00:00:00Z"
+# Time window
+guardlog scan access.log \
+  --since "2026-05-01T00:00:00Z" \
+  --until "2026-05-02T00:00:00Z"
 
-# Only analyze /api/ paths
+# Only /api/ requests
 guardlog scan access.log --path-filter "^/api/"
 
-# Combine: 404s from a subnet since a date
-guardlog scan access.log --filter-ip 10.0.0.0/8 --filter-status 404 --since "2026-05-01"
+# Combine: 404s from a subnet in a date range
+guardlog scan access.log \
+  --filter-ip 10.0.0.0/8 \
+  --filter-status 404 \
+  --since "2026-05-01"
 ```
 
 ---
 
 ## Webhook Alerts
 
+guardlog POSTs a JSON security report to any HTTP/HTTPS endpoint after scanning. Slack Incoming Webhooks are auto-detected and sent with color-coded formatting (green/yellow/red by risk level).
+
 ```bash
-# Generic endpoint
+# Generic HTTP endpoint
 guardlog scan access.log --webhook https://alerts.myapp.com/hooks/security
 
-# Slack Incoming Webhook (auto-detected by hostname)
+# Slack Incoming Webhook
 guardlog scan access.log --webhook https://hooks.slack.com/services/T.../B.../xxx
 
-# Combine with CI mode
-guardlog scan access.log --ci --webhook https://hooks.slack.com/services/...
+# Alert AND gate the pipeline
+guardlog scan access.log --ci \
+  --webhook https://hooks.slack.com/services/T.../B.../xxx
 ```
-
-The Slack payload includes risk level, threat breakdown, and top attacker IPs with color coding (green/yellow/red).
 
 ---
 
-## JSON Report Format
+## Output Formats
+
+### Terminal (default)
+
+Color-coded human-readable report. Green = LOW, yellow = MEDIUM, red = HIGH.
+
+### JSON
+
+```bash
+guardlog scan access.log --json
+guardlog scan access.log --output report.json
+```
 
 ```json
 {
@@ -199,9 +401,12 @@ The Slack payload includes risk level, threat breakdown, and top attacker IPs wi
 }
 ```
 
----
+### CSV
 
-## CSV Report Format
+```bash
+guardlog scan access.log --csv
+guardlog scan access.log --output report.csv
+```
 
 ```csv
 # guardlog Security Report
@@ -221,17 +426,19 @@ rank,ip,hit_count,reason
 
 | Code | Meaning |
 |------|---------|
-| `0`  | Safe — no HIGH risk detected (or `--ci` not used) |
-| `1`  | HIGH risk detected (`--ci` flag only) |
-| `2`  | Error (file not found, parse failure, etc.) |
+| `0` | Safe — no HIGH risk detected (or `--ci` not used) |
+| `1` | HIGH risk detected (`--ci` flag only) |
+| `2` | Error — file not found, parse failure, etc. |
 
 ---
 
 ## Supported Log Formats
 
-- **Apache / Nginx Combined Log Format** (default)
-- **W3C / IIS Extended Log Format**
-- **Rotated logs** — `.gz` / `.gzip` files decompressed automatically
+| Format | Example line |
+|--------|-------------|
+| **Apache / Nginx Combined** | `127.0.0.1 - - [05/May/2026:10:00:00 +0000] "GET / HTTP/1.1" 200 612 "-" "Mozilla/5.0"` |
+| **W3C / IIS Extended** | `#Fields: date time c-ip cs-method cs-uri-stem sc-status` |
+| **Rotated logs** (`.gz`) | Decompressed automatically via `zlib` |
 
 ---
 
@@ -240,7 +447,7 @@ rank,ip,hit_count,reason
 ### Brute Force
 - Same IP with ≥ 10 failed auth responses (`401` / `403` / `429`) to login endpoints within 60 seconds
 - Any IP exceeding 100 requests/minute to any endpoint
-- Detected endpoints: `/login`, `/signin`, `/auth`, `/wp-login.php`, `/admin`, `/api/login`
+- Monitored endpoints: `/login`, `/signin`, `/auth`, `/wp-login.php`, `/admin`, `/api/login`
 
 ### SQL Injection (18+ patterns)
 - `' OR 1=1`, `' AND 1=1`
@@ -249,7 +456,7 @@ rank,ip,hit_count,reason
 - `INFORMATION_SCHEMA`, `xp_cmdshell`, `sp_executesql`
 - `CAST()`, `CONVERT()`
 - URL-encoded variants (`%27`, `%3D`, `%3C`, etc.)
-- Applied to URL path + query string + User-Agent header
+- Scanned in: URL path, query string, and User-Agent header
 
 ### XSS (17+ patterns)
 - `<script>` tags (raw and URL-encoded)
@@ -257,29 +464,105 @@ rank,ip,hit_count,reason
 - `alert()`, `confirm()`, `prompt()`, `eval()`
 - `document.cookie`, `document.write()`, `window.location`
 - `javascript:`, `vbscript:`, `data:text/html`
-- HTML entity encoding used in evasion (`&#x…;`)
+- HTML entity encoding variants (`&#x…;`)
 
 ### Bot / Scanner Detection
-**User-Agent blacklist** (20+ entries):
+
+**User-Agent blacklist (20+ tools):**
 `curl`, `wget`, `python-requests`, `python-urllib`, `libwww-perl`, `sqlmap`, `nikto`, `nmap`, `masscan`, `dirbuster`, `gobuster`, `wfuzz`, `nuclei`, `hydra`, `medusa`, `BurpSuite`, `OWASP ZAP`, `Acunetix`, `Nessus`, `Shodan`, `Censys`, `zgrab`
 
-Also detects: missing/empty User-Agent, high-frequency IP bursts (> 200 req/min)
+Also flags: missing/empty User-Agent, high-frequency IP bursts (> 200 req/min)
 
-### 404 Scan / Directory Brute Force Detection
+### 404 Scan / Directory Brute Force
 - IPs generating ≥ 20 `404` responses within 60 seconds
-- Immediate flag for sensitive path probes:
+- Sensitive path probes flagged immediately:
   `.env`, `wp-config.php`, `phpinfo.php`, `.git/`, `.bak`, `.sql`, `.zip`, `/cgi-bin/`, `/actuator/`, `/server-status`, `/manager/`
+
+---
+
+## CI/CD Integration
+
+### GitHub Actions
+
+```yaml
+name: Security Log Scan
+
+on: [push]
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install guardlog
+        run: npm install -g guardlog
+
+      - name: Scan access log
+        run: guardlog scan access.log --ci --output guardlog-report.json
+
+      - name: Upload security report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: guardlog-report
+          path: guardlog-report.json
+```
+
+A full multi-node (18/20/22) workflow is at [.github/workflows/ci.yml](.github/workflows/ci.yml).
+
+### GitLab CI
+
+```yaml
+security-scan:
+  image: node:20
+  script:
+    - npm install -g guardlog
+    - guardlog scan access.log --ci --output guardlog-report.json
+  artifacts:
+    paths:
+      - guardlog-report.json
+    when: always
+```
+
+---
+
+## Node.js API
+
+Use guardlog programmatically in your own Node.js scripts or applications.
+
+```bash
+npm install guardlog
+```
+
+```js
+const { analyzeFile } = require('guardlog');
+
+const result = await analyzeFile('./access.log', {
+  filters: {
+    ip: '10.0.0.0/8',           // CIDR filter
+    status: 404,                 // HTTP status code filter
+    since: '2026-05-01T00:00Z', // start time (ISO 8601)
+    until: '2026-05-02T00:00Z', // end time (ISO 8601)
+    pathPattern: '^/api/',       // URL path regex
+  },
+});
+
+console.log(result.summary.risk_level);    // "HIGH" | "MEDIUM" | "LOW"
+console.log(result.threats.sql_injection); // count of SQL injection hits
+console.log(result.top_attacker_ips);      // [{ ip, count, reason }]
+```
 
 ---
 
 ## Plugin API
 
-Write custom scanner plugins and pass them via the Node.js API:
+Add custom threat detectors without modifying the core codebase.
 
 ```js
 const { analyzeFile } = require('guardlog');
 
-const myPlugin = {
+const pathTraversalPlugin = {
   name: 'pathTraversal',
   scan(entries) {
     const hits = entries.filter(e => e.path.includes('../'));
@@ -292,13 +575,14 @@ const myPlugin = {
 };
 
 const result = await analyzeFile('./access.log', {
-  plugins: [myPlugin],
+  plugins: [pathTraversalPlugin],
 });
 
 console.log(result.threats.plugins.pathTraversal); // count of flagged entries
 ```
 
-Plugin interface:
+**Plugin interface:**
+
 ```ts
 interface Plugin {
   name: string;
@@ -309,26 +593,7 @@ interface Plugin {
 }
 ```
 
----
-
-## GitHub Actions Integration
-
-```yaml
-- name: Install guardlog
-  run: npm install -g guardlog
-
-- name: Scan access.log
-  run: guardlog scan access.log --ci --output guardlog-report.json
-
-- name: Upload security report
-  if: always()
-  uses: actions/upload-artifact@v4
-  with:
-    name: guardlog-report
-    path: guardlog-report.json
-```
-
-A full multi-node workflow is at [.github/workflows/ci.yml](.github/workflows/ci.yml).
+Plugin errors are isolated — a failing plugin never crashes the main analyzer.
 
 ---
 
@@ -359,28 +624,6 @@ guardlog/
 
 ---
 
-## Node.js API
-
-```js
-const { analyzeFile, analyzeEntries } = require('guardlog');
-
-// Scan a file
-const result = await analyzeFile('./access.log', {
-  filters: {
-    ip: '10.0.0.0/8',          // CIDR filter
-    status: 404,                // status code filter
-    since: '2026-05-01T00:00Z', // start time
-    until: '2026-05-02T00:00Z', // end time
-    pathPattern: '^/api/',      // path regex
-  },
-  plugins: [myPlugin],          // custom scanner plugins
-});
-
-console.log(result.summary.risk_level); // "HIGH" | "MEDIUM" | "LOW"
-```
-
----
-
 ## Running Tests
 
 ```bash
@@ -393,225 +636,17 @@ npm test
 
 ## Contributing
 
+Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting a pull request.
+
+Quick steps:
+
 1. Fork the repository
 2. Create a feature branch: `git checkout -b feature/my-feature`
 3. Add tests for any new detection patterns
 4. Commit: `git commit -m "feat: add my feature"`
 5. Push and open a Pull Request
 
-All PRs run through the CI pipeline automatically on Node.js 18, 20, and 22.
-
----
-
-## License
-
-[MIT](LICENSE) — Copyright (c) 2026 guardlog contributors
-
-> Lightweight, fast, real-time CLI security log analyzer for developers and DevOps engineers.
-
-[![npm version](https://img.shields.io/npm/v/guardlog)](https://www.npmjs.com/package/guardlog)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Node.js CI](https://github.com/boniyeamincse/guardlog/actions/workflows/ci.yml/badge.svg)](https://github.com/boniyeamincse/guardlog/actions)
-
----
-
-## Features
-
-- **Brute force detection** — identifies repeated failed login attempts and high-frequency IP bursts
-- **SQL injection detection** — pattern-matched against 18+ known payload signatures
-- **XSS detection** — covers script tags, event handlers, encoded payloads, and more
-- **Bot & scanner detection** — flags curl, sqlmap, nikto, nuclei, dirbuster, and many others
-- **Risk scoring** — `LOW` / `MEDIUM` / `HIGH` engine with CI-friendly exit codes
-- **Streaming architecture** — uses `fs.createReadStream` + `readline`; O(n), no full-file load
-- **Live monitor mode** — watches a file for new entries in real-time
-- **JSON output** — structured reports for downstream tooling
-- **GitHub Actions integration** — drop-in step for your CI/CD pipeline
-
----
-
-## Installation
-
-```bash
-# Global install (recommended for CLI usage)
-npm install -g guardlog
-
-# Or use with npx
-npx guardlog scan ./access.log
-```
-
----
-
-## Usage
-
-### Scan a log file
-
-```bash
-guardlog scan ./access.log
-```
-
-### Output a JSON report to stdout
-
-```bash
-guardlog scan ./access.log --json
-```
-
-### Save a JSON report to a file
-
-```bash
-guardlog scan ./access.log --output report.json
-```
-
-### CI mode — exits with code 1 when risk is HIGH
-
-```bash
-guardlog scan ./access.log --ci
-```
-
-### Live monitor mode — watch a file for new threats in real-time
-
-```bash
-guardlog monitor --live /var/log/nginx/access.log
-```
-
----
-
-## JSON Report Format
-
-```json
-{
-  "file": "access.log",
-  "summary": {
-    "total_requests": 12000,
-    "suspicious_requests": 230,
-    "risk_level": "HIGH"
-  },
-  "threats": {
-    "brute_force": 12,
-    "sql_injection": 5,
-    "xss": 3,
-    "bot_activity": 40
-  },
-  "top_attacker_ips": [
-    {
-      "ip": "192.168.1.10",
-      "count": 300,
-      "reason": "brute_force"
-    }
-  ],
-  "timestamp": "2026-05-05T00:00:00.000Z"
-}
-```
-
----
-
-## Exit Codes
-
-| Code | Meaning |
-|------|---------|
-| `0`  | Safe — no HIGH risk detected (or `--ci` not used) |
-| `1`  | HIGH risk detected (only with `--ci` flag) |
-| `2`  | Error (file not found, parse failure, etc.) |
-
----
-
-## Supported Log Formats
-
-- **Apache / Nginx Combined Log Format** (default)
-- **W3C / IIS Extended Log Format**
-
----
-
-## Detection Rules
-
-### Brute Force
-- Same IP with ≥ 10 failed auth requests (`401` / `403` / `429`) to login endpoints within 60 seconds
-- Any IP exceeding 100 requests/minute to any endpoint
-
-### SQL Injection
-Pattern coverage includes:
-- `' OR 1=1`, `' AND 1=1`
-- `UNION SELECT`, `DROP TABLE`, `DELETE FROM`
-- `SLEEP()`, `BENCHMARK()`, `WAITFOR`
-- `INFORMATION_SCHEMA`, `xp_cmdshell`, `sp_executesql`
-- URL-encoded variants (`%27`, `%3D`, etc.)
-
-### XSS
-- `<script>` tags (including encoded)
-- Event handlers: `onerror=`, `onclick=`, `onload=`, …
-- `alert()`, `confirm()`, `prompt()`, `eval()`
-- `document.cookie`, `window.location`
-- `javascript:`, `vbscript:`, `data:text/html`
-
-### Bot / Scanner Detection
-User-Agent blacklist includes: `curl`, `wget`, `python-requests`, `sqlmap`, `nikto`, `nuclei`, `nmap`, `masscan`, `dirbuster`, `gobuster`, `hydra`, `Burp Suite`, `OWASP ZAP`, `Acunetix`, `Nessus`, `Shodan`, and more.
-
-Scanner path probes: `.env`, `wp-config.php`, `phpinfo.php`, `.git/`, `/admin/`, `/phpmyadmin`, `/backup`, and more.
-
----
-
-## GitHub Actions Integration
-
-```yaml
-- name: Install guardlog
-  run: npm install -g guardlog
-
-- name: Scan access.log
-  run: guardlog scan access.log --ci --output guardlog-report.json
-
-- name: Upload security report
-  if: always()
-  uses: actions/upload-artifact@v4
-  with:
-    name: guardlog-report
-    path: guardlog-report.json
-```
-
-A full workflow file is available at [.github/workflows/ci.yml](.github/workflows/ci.yml).
-
----
-
-## Architecture
-
-```
-guardlog/
-├── bin/
-│   └── cli.js              # Commander-based CLI entry point
-├── lib/
-│   ├── analyzer.js         # Orchestrates all scanners, builds report
-│   ├── parser.js           # Streaming log line parser (Combined + W3C)
-│   ├── monitor.js          # Live file watcher (fs.watch)
-│   ├── reporter.js         # Terminal (chalk) and JSON output formatters
-│   └── scanner/
-│       ├── bruteForce.js   # Sliding-window brute force detection
-│       ├── sqlInjection.js # SQL injection regex scanner
-│       ├── xss.js          # XSS pattern scanner
-│       └── botDetector.js  # UA + path + frequency bot detection
-├── utils/
-│   └── riskEngine.js       # LOW / MEDIUM / HIGH scoring
-└── tests/
-    └── guardlog.test.js    # Node.js built-in test runner
-```
-
----
-
-## Running Tests
-
-```bash
-npm test
-```
-
-Tests use Node.js's built-in `node:test` runner — zero external test dependencies.
-
----
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/my-feature`
-3. Commit your changes: `git commit -m "feat: add my feature"`
-4. Push and open a Pull Request
-
-Please keep PRs focused. Add tests for any new scanner patterns. All PRs are run through the CI pipeline automatically.
+All PRs are automatically tested on Node.js 18, 20, and 22 via GitHub Actions.
 
 ---
 
